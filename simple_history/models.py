@@ -2,6 +2,7 @@ import copy
 import importlib
 import uuid
 import warnings
+import traceback
 
 from django.apps import apps
 from django.conf import settings
@@ -475,6 +476,7 @@ class HistoricalRecords:
             "history_object": HistoricalObjectDescriptor(
                 model, self.fields_included(model)
             ),
+            "stack_trace": models.TextField(),
             "instance": property(get_instance),
             "instance_type": model,
             "next_record": property(get_next_record),
@@ -567,6 +569,7 @@ class HistoricalRecords:
             instance, history_type, using
         )
         manager = getattr(instance, self.manager_name)
+        trace = get_stack_trace()
 
         attrs = {}
         for field in self.fields_included(instance):
@@ -581,6 +584,7 @@ class HistoricalRecords:
             history_type=history_type,
             history_user=history_user,
             history_change_reason=history_change_reason,
+            stack_trace=trace,
             **attrs,
         )
 
@@ -619,6 +623,28 @@ class HistoricalRecords:
                 pass
 
         return self.get_user(instance=instance, request=request)
+
+
+def get_stack_trace():
+
+    def is_last_frame(frame):
+        if getattr(frame, 'name', None) != 'save':
+            return False
+        if not getattr(frame, 'filename', '').endswith('base/models/core.py'):
+            return False
+        return True
+
+    # noinspection PyListCreation
+    stack_to_save = []
+    stack_to_save.append("Release: %s" % getattr(settings, "CODE_VERSION", "unknown"))
+    for stack_frame in traceback.extract_stack():
+        stack_to_save.append("File %s" % stack_frame.filename)
+        stack_to_save.append("\tFunction name: %s" % stack_frame.name)
+        stack_to_save.append("\tLine %s: %s" % (stack_frame.lineno, stack_frame.line))
+        if is_last_frame(stack_frame):
+            break
+
+    return "\n".join(stack_to_save)
 
 
 def transform_field(field):
