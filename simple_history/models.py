@@ -476,7 +476,7 @@ class HistoricalRecords:
             "history_object": HistoricalObjectDescriptor(
                 model, self.fields_included(model)
             ),
-            "stack_trace": models.TextField(),
+            "stack_trace": models.TextField(null=True, blank=True),
             "instance": property(get_instance),
             "instance_type": model,
             "next_record": property(get_next_record),
